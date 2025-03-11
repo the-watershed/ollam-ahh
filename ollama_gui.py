@@ -22,7 +22,7 @@ class OllamaFinderGUI:
     def __init__(self, master):
         self.master = master
         master.title("Ollama Controller")
-        master.geometry("800x600")  # Set initial window size
+        master.geometry("900x650")  # Set initial window size
         master.minsize(600, 400)  # Set minimum window size
 
         # Embed the icon
@@ -35,17 +35,17 @@ class OllamaFinderGUI:
         except FileNotFoundError:
             print("Icon file 'dungeon.png' not found. Continuing without icon.")
 
-        # --- Styling ---
+        # --- Styling with updated modern palette ---
         self.style = ttk.Style()
-        self.bg_color = "#002b36"  # Solarized Dark Base02
-        self.text_color = "#839496"  # Solarized Dark Base0
-        self.checking_color = "#b58900"  # Solarized Dark Yellow
-        self.found_color = "#859900"  # Solarized Dark Green
-        self.not_found_color = "#dc322f"  # Solarized Dark Red
-        self.cancelled_color = "#cb4b16"  # Solarized Dark Orange
-        self.button_color = "#586e75"  # Solarized Dark Base01
-        self.button_text_color = "#000000"  # Black
-        self.listbox_select_color = "#073642"  # Solarized Dark Base03
+        self.bg_color = "#2E3440"           # Nord dark background
+        self.text_color = "#D8DEE9"         # Nord foreground
+        self.checking_color = "#EBCB8B"     # Soft yellow
+        self.found_color = "#A3BE8C"        # Soft green
+        self.not_found_color = "#BF616A"    # Soft red
+        self.cancelled_color = "#D08770"    # Soft orange
+        self.button_color = "#5E81AC"       # Muted blue
+        self.button_text_color = "#ECEFF4"  # Light text on buttons
+        self.listbox_select_color = "#4C566A"  # Subtle selection
 
         configure_styles(self.style, self.bg_color, self.text_color, self.button_color, self.button_text_color, self.listbox_select_color)
 

@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 def start_gui():
     logging.debug("Starting GUI")
     root = tk.Tk()
+    root.geometry("900x650")  # Updated window size for a modern look
     gui = OllamaFinderGUI(root)
     root.mainloop()
 
