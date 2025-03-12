@@ -1,3 +1,4 @@
+# main.py
 import tkinter as tk
 from ollama_gui import OllamaFinderGUI
 import subprocess
