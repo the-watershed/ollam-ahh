@@ -6,14 +6,61 @@ from tkinter import simpledialog, messagebox
 import threading
 import queue
 import re
+import time  # Added missing import for sleep functionality
+import shutil  # Added missing import
+import requests  # added import
 
 MAX_DEPTH = 5  # Limit the search depth
 
 def find_ollama(gui):
     """
-    Finds the Ollama installation directory by scanning the entire hard drive.
+    Finds the Ollama installation directory by scanning common installation locations first,
+    then falling back to a broader search if needed.
     Yields potential paths to the Ollama executable.
     """
+    # Define common installation locations to check first
+    common_locations = []
+    
+    if platform.system() == "Windows":
+        # Common Windows installation locations
+        common_locations = [
+            os.path.join(os.environ.get("PROGRAMFILES", "C:\\Program Files"), "Ollama"),
+            os.path.join(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"), "Ollama"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Ollama"),
+            os.path.join(os.environ.get("APPDATA", ""), "Ollama"),
+            os.path.join(os.environ.get("USERPROFILE", ""), "Ollama"),
+        ]
+    else:
+        # Common Unix-like installation locations
+        common_locations = [
+            "/usr/local/bin",
+            "/usr/bin",
+            "/opt/ollama",
+            os.path.expanduser("~/ollama"),
+            os.path.expanduser("~/.local/bin")
+        ]
+    
+    # First check if ollama is in PATH
+    ollama_in_path = shutil.which("ollama")
+    if ollama_in_path:
+        gui.log_message(f"Ollama found in PATH: {ollama_in_path}", gui.checking_color)
+        yield ollama_in_path
+        return  # Exit early if found in PATH
+        
+    # Check common installation locations first
+    for location in common_locations:
+        if os.path.exists(location):
+            gui.log_message(f"Checking common location: {location}", gui.checking_color)
+            executable_name = "ollama.exe" if platform.system() == "Windows" else "ollama"
+            path = os.path.join(location, executable_name)
+            if os.path.exists(path):
+                gui.log_message(f"Found Ollama at common location: {path}", gui.checking_color)
+                yield path
+                return  # Exit early if found in common location
+    
+    # If not found in common locations, do a more extensive search
+    gui.log_message("Ollama not found in common locations. Starting broader search (this may take time)...", gui.checking_color)
+    
     if platform.system() == "Windows":
         drives = [
             d + ":\\" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(d + ":")
@@ -186,29 +233,141 @@ def populate_running_models_list(gui):
 
 def run_command(gui, command):
     """
-    Runs a command and displays the output in real-time.
+    Runs a command and displays the output in real-time to mimic a DOS window.
+    Shows the command prompt, echoes the command, and displays formatted output.
     """
     gui.output_text.config(state=tk.NORMAL)
     gui.output_text.delete("1.0", tk.END)  # Clear previous output
+    
+    # Create DOS-like command tags
+    gui.output_text.tag_config("prompt", foreground="#CCCCCC")
+    gui.output_text.tag_config("command", foreground="#FFFFFF", font=("Courier New", 10, "bold"))
+    gui.output_text.tag_config("output", foreground="#00FF00")
+    gui.output_text.tag_config("error", foreground="#FF6666")
+    
+    # Create a DOS-like command prompt
+    current_dir = os.getcwd()
+    # Format the command prompt to look like DOS: C:\path\to\dir>
+    gui.output_text.insert(tk.END, f"{current_dir}>", "prompt")
+    # Echo the command that's being run
+    cmd_str = " ".join(command)
+    gui.output_text.insert(tk.END, f"{cmd_str}\n\n", "command")
+    gui.output_text.see(tk.END)
     gui.output_text.config(state=tk.DISABLED)
+    gui.master.update()  # Force update to show command before output starts
 
-    def enqueue_output(process, queue):
-        while True:
-            chunk = process.stdout.read(1024)  # switched from stderr to stdout
-            if not chunk:
-                break
-            # No decoding needed, chunk is already a string
-            clean_chunk = re.sub(r'\x1b\[[0-9;]*m', '', chunk)
-            lines = clean_chunk.splitlines()
-            for line in lines:
-                queue.put(line)
+    def enqueue_output(process, out_queue, err_queue):
+        # Capture and process stdout
+        for line in process.stdout:
+            if line:
+                # Remove ANSI color codes and control characters
+                clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+                clean_line = re.sub(r'[\r\n]+', '\n', clean_line)
+                out_queue.put(clean_line)
+        
+        # Capture and process stderr
+        for line in process.stderr:
+            if line:
+                # Remove ANSI color codes and control characters
+                clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+                clean_line = re.sub(r'[\r\n]+', '\n', clean_line)
+                err_queue.put(clean_line)
 
     try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
-        output_thread = threading.Thread(target=enqueue_output, args=(process, gui.queue))
-        output_thread.daemon = True  # Allow the program to exit even if this thread is running
+        # Create separate queues for stdout and stderr
+        out_queue = queue.Queue()
+        err_queue = queue.Queue()
+        
+        # Use line buffering for more responsive output
+        process = subprocess.Popen(
+            command, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True, 
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        # Start thread to capture output
+        output_thread = threading.Thread(
+            target=enqueue_output, 
+            args=(process, out_queue, err_queue)
+        )
+        output_thread.daemon = True
         output_thread.start()
+        
+        # Process output in real-time
+        while process.poll() is None or not (out_queue.empty() and err_queue.empty()):
+            # Process stdout
+            try:
+                while True:
+                    line = out_queue.get_nowait()
+                    gui.output_text.config(state=tk.NORMAL)
+                    gui.output_text.insert(tk.END, line, "output")
+                    gui.output_text.see(tk.END)
+                    gui.output_text.config(state=tk.DISABLED)
+                    gui.master.update()
+            except queue.Empty:
+                pass
+                
+            # Process stderr
+            try:
+                while True:
+                    line = err_queue.get_nowait()
+                    gui.output_text.config(state=tk.NORMAL)
+                    gui.output_text.insert(tk.END, line, "error")
+                    gui.output_text.see(tk.END)
+                    gui.output_text.config(state=tk.DISABLED)
+                    gui.master.update()
+            except queue.Empty:
+                pass
+                
+            # Brief pause to prevent CPU hogging
+            time.sleep(0.05)
+            gui.master.update()
+        
+        # Add exit code information like DOS
+        exit_code = process.returncode
+        gui.output_text.config(state=tk.NORMAL)
+        if exit_code == 0:
+            gui.output_text.insert(tk.END, f"\nCommand completed successfully with exit code {exit_code}\n", "output")
+        else:
+            gui.output_text.insert(tk.END, f"\nCommand failed with exit code {exit_code}\n", "error")
+        
+        # Add another command prompt at the end
+        gui.output_text.insert(tk.END, f"\n{current_dir}>", "prompt")
+        gui.output_text.see(tk.END)
+        gui.output_text.config(state=tk.DISABLED)
+        
     except FileNotFoundError:
-        log_message(gui, "Ollama not found. Please ensure it is installed and in your PATH.", gui.not_found_color)
+        gui.output_text.config(state=tk.NORMAL)
+        gui.output_text.insert(tk.END, "'{}' is not recognized as an internal or external command,\noperable program or batch file.\n".format(command[0]), "error")
+        gui.output_text.insert(tk.END, f"\n{current_dir}>", "prompt")
+        gui.output_text.see(tk.END)
+        gui.output_text.config(state=tk.DISABLED)
     except Exception as e:
-        log_message(gui, f"Error running command: {e}", gui.not_found_color)
+        gui.output_text.config(state=tk.NORMAL)
+        gui.output_text.insert(tk.END, f"Error executing command: {e}\n", "error")
+        gui.output_text.insert(tk.END, f"\n{current_dir}>", "prompt")
+        gui.output_text.see(tk.END)
+        gui.output_text.config(state=tk.DISABLED)
+
+def chat_with_ai(message):
+    """
+    Communicates with the AI model using the generate endpoint.
+    Sends a POST request to http://localhost:11434/api/generate with parameters for model, prompt, and stream.
+    Returns the AI response.
+    """
+    url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": "smollm2:135m",
+        "prompt": message,
+        "stream": False
+    }
+    try:
+        response = requests.post(url, json=payload, verify=False)
+        response.raise_for_status()
+        # Assuming the returned JSON contains a field "completion" for the answer.
+        return response.json().get("completion", "No completion field returned")
+    except Exception as e:
+        return f"Error communicating with AI: {e}"

@@ -27,12 +27,15 @@ def serve_ollama(gui):
     gui.run_command(["ollama", "serve"])
 
 def run_selected_model(gui):
-    if (gui.selected_model):
-        log_message(gui, f"Running model: {gui.selected_model}", gui.found_color)
+    """
+    Runs the currently selected running model.
+    """
+    if gui.selected_running_model:
+        log_message(gui, f"Running model: {gui.selected_running_model}", gui.found_color)
         log_message(gui, "Outputs will appear in the 'Output' pane.", gui.found_color)
-        gui.run_command(["ollama", "run", gui.selected_model])
+        gui.run_command(["ollama", "run", gui.selected_running_model])
     else:
-        messagebox.showinfo("Info", "No model selected. Please select a model from the list.")
+        messagebox.showinfo("Info", "No running model selected. Please select a running model from the list.")
 
 def list_models(gui):
     """

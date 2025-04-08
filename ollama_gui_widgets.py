@@ -190,6 +190,71 @@ def create_widgets(self, master):
     cancelled_label = ttk.Label(legend_frame, text="Cancelled", foreground=self.cancelled_color, background=self.bg_color)
     cancelled_label.grid(row=1, column=3, sticky="w", padx=10)
 
+    # --- New Chat Window ---
+    # Create chat window in the chat_frame (newly added in ollama_gui.py)
+    self.chat_label = ttk.Label(self.chat_frame, text="Chat with AI:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3", background=self.bg_color)
+    self.chat_label.pack(side=tk.TOP, fill=tk.X, pady=5)
+    
+    # Modified to use black background with color-coded text
+    self.chat_text = scrolledtext.ScrolledText(
+        self.chat_frame, 
+        wrap=tk.WORD, 
+        bg="black", 
+        fg="#00FF00",  # Default text color (green)
+        font=("Courier New", 10)  # Monospace font for better readability
+    )
+    self.chat_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+    self.chat_text.config(state=tk.DISABLED)
+    
+    # Create tags for color-coded text
+    self.chat_text.tag_config("user", foreground="#4DA6FF")  # Blue for user messages
+    self.chat_text.tag_config("ai", foreground="#00FF00")    # Green for AI responses
+    self.chat_text.tag_config("system", foreground="#FFD700")  # Gold for system messages
+    self.chat_text.tag_config("error", foreground="#FF5555")   # Red for errors
+    self.chat_text.tag_config("debug", foreground="#888888")   # Gray for debug info
+    
+    # Match entry color scheme with chat window
+    self.chat_entry = tk.Entry(self.chat_frame, bg="#222222", fg="#FFFFFF", insertbackground="#FFFFFF")
+    self.chat_entry.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+    self.chat_button = ttk.Button(self.chat_frame, text="Send", command=self.send_chat)
+    self.chat_button.pack(side=tk.TOP, padx=5, pady=5)
+
+    # --- Model Monitoring Controls ---
+    self.monitoring_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
+    self.monitoring_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5, padx=5)
+    
+    self.monitoring_label = ttk.Label(
+        self.monitoring_frame, 
+        text="Model Monitoring:", 
+        font=("TkDefaultFont", 9, "bold"),
+        foreground="#fdf6e3", 
+        background=self.bg_color
+    )
+    self.monitoring_label.pack(side=tk.LEFT, padx=5, pady=5)
+    
+    self.monitor_button = ttk.Button(
+        self.monitoring_frame, 
+        text="Pause Monitoring", 
+        width=12, 
+        command=self.toggle_monitoring
+    )
+    self.monitor_button.pack(side=tk.LEFT, padx=5, pady=5)
+    
+    self.interval_button = ttk.Button(
+        self.monitoring_frame, 
+        text="Set Interval", 
+        width=12, 
+        command=self.adjust_monitoring_interval
+    )
+    self.interval_button.pack(side=tk.LEFT, padx=5, pady=5)
+    
+    # Add tooltips for monitoring buttons
+    self.monitor_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Toggle continuous model monitoring on/off", ""))
+    self.monitor_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
+    
+    self.interval_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Adjust how frequently models are checked (milliseconds)", ""))
+    self.interval_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
+
 def bind_events(self, master):
     master.bind("<Configure>", self.on_resize)
     self.models_listbox.bind("<<ListboxSelect>>", self.show_model_information)
