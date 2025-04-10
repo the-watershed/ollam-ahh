@@ -340,7 +340,7 @@ class OllamaFinderGUI:
         Implements radiation shielding protocols for deep space communications.
         """
         # System safeguard check - verify life support systems
-        user_message = self.chat_entry.get().strip()
+        user_message = self.chat_entry.get("1.0", tk.END).strip()
         if user_message:
             if not self.selected_running_model:
                 import tkinter.messagebox as messagebox
@@ -352,7 +352,13 @@ class OllamaFinderGUI:
             self.chat_text.insert(tk.END, "CREW: ", "user")
             self.chat_text.insert(tk.END, user_message + "\n", "user")
             self.chat_text.config(state=tk.DISABLED)
-            self.chat_entry.delete(0, tk.END)
+            self.chat_entry.delete("1.0", tk.END)
+
+            # Populate the model dropdown list with available models
+            available_models = get_ollama_models()
+            self.chat_model_dropdown["values"] = available_models
+            if available_models:
+                self.chat_model_var.set(available_models[0])  # Set the first model as default
             
             import requests
             payload = {
@@ -997,3 +1003,18 @@ class OllamaFinderGUI:
             self.help_button.destroy()
             self.help_button = None
             self.log_message("Help button removed successfully.", self.found_color)
+
+    def filter_models_by_category(self, category):
+        """Filter the models displayed in the listbox by the selected category."""
+        # Placeholder logic for filtering models
+        if category == "All":
+            filtered_models = self.previous_available_models
+        else:
+            filtered_models = [model for model in self.previous_available_models if category.lower() in model.lower()]
+
+        # Update the models listbox with the filtered models
+        self.models_listbox.delete(0, tk.END)
+        for model in filtered_models:
+            self.models_listbox.insert(tk.END, model)
+
+        self.log_message(f"Filtered models by category: {category}", self.found_color)

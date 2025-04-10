@@ -61,10 +61,11 @@ def start_gui():
     # Ensure the main frame uses pack instead of grid to avoid conflicts
     gui.main_frame.pack(fill=tk.BOTH, expand=True)
     
-    try:
-        root.mainloop()
-    except Exception as e:
-        logging.error(f"Error starting GUI: {e}")
+    return gui  # Return the GUI instance for testing purposes
 
 if __name__ == "__main__":
-    start_gui()
+    gui = start_gui()
+    try:
+        gui.root.mainloop()
+    except Exception as e:
+        logging.error(f"Error starting GUI: {e}")
