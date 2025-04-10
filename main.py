@@ -48,6 +48,19 @@ def start_gui():
     root = tk.Tk()
     root.geometry("900x650")  # Updated window size for a modern look
     gui = OllamaFinderGUI(root)
+    
+    # Directly remove the "?" button from the GUI
+    if hasattr(gui, 'help_button') and gui.help_button:
+        gui.help_button.destroy()
+        gui.help_button = None
+
+    # Configure the root window to expand and fill the available space
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+
+    # Ensure the main frame uses pack instead of grid to avoid conflicts
+    gui.main_frame.pack(fill=tk.BOTH, expand=True)
+    
     try:
         root.mainloop()
     except Exception as e:

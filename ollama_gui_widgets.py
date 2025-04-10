@@ -1,6 +1,9 @@
 import tkinter as tk
-from tkinter import scrolledtext, Listbox, ttk
+from tkinter import scrolledtext, Listbox, ttk, filedialog, simpledialog
 import webbrowser
+import os
+import json
+from ollama_system_monitor import SystemMonitor, ModelMetricsMonitor
 
 class HoverTooltip:
     """
@@ -21,7 +24,7 @@ class HoverTooltip:
         self.tooltip.overrideredirect(True)
         self.tooltip.config(bg="#073642")  # or any desired background
 
-        self.label = ttk.Label(self.tooltip, text=text, background="#073642", foreground="#fdf6e3")
+        self.label = ttk.Label(self.tooltip, text=text, background="#073642", foreground="#fdf6e3", font=("TkDefaultFont", 7))
         self.label.pack(padx=5, pady=5)
 
         # Bind to track motion inside the tooltip
@@ -54,208 +57,516 @@ class HoverTooltip:
         if (event.state & 0x20000) != 0:
             if not self.anchored:
                 self.anchored = True
-            self.label.configure(foreground="blue", font=("", 9, "underline"))
+            self.label.configure(foreground="blue", font=("", 7, "underline"))
         else:
             if self.anchored:
                 self.anchored = False
-            self.label.configure(foreground="#fdf6e3", font=("", 9, "normal"))
+            self.label.configure(foreground="#fdf6e3", font=("", 7, "normal"))
 
     def _on_tooltip_click(self, event):
         # Check if ALT is held
         if (event.state & 0x20000) != 0 and self.link_url:
             webbrowser.open(self.link_url)
 
-def create_widgets(self, master):
-    """
-    Creates the widgets for the GUI.
-    """
-    # --- Left Frame Widgets ---
-    # Available Models
-    self.models_label = ttk.Label(self.left_frame, text="Available Models:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3")
-    self.models_label.pack(side=tk.TOP, fill=tk.X, pady=5)
+def create_left_frame(self):
+    """Creates the left frame with model selection and information displays"""
+    # Reduce size by 25%
+    button_width = 15  # Reduced from 20
+    button_height = 1  # Reduced from 1.5 or 2
 
-    self.models_listbox = Listbox(self.left_frame, bg=self.bg_color, fg=self.text_color, borderwidth=0, highlightthickness=0)
-    self.models_listbox.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=5)
-    self.models_listbox.bind("<<ListboxSelect>>", self.show_model_information)
-
-    # Running Models
-    self.running_models_label = ttk.Label(self.left_frame, text="Running Models:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3")
-    self.running_models_label.pack(side=tk.TOP, fill=tk.X, pady=5)
-
-    self.running_models_listbox = Listbox(self.left_frame, bg=self.bg_color, fg=self.text_color, borderwidth=0, highlightthickness=0)
-    self.running_models_listbox.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=5)
-    self.running_models_listbox.bind("<<ListboxSelect>>", self.show_running_model_information)
-
-    # --- Right Frame Widgets ---
-    # Model Information
-    self.model_info_label = ttk.Label(self.right_frame, text="Model Information:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3")
-    self.model_info_label.pack(side=tk.TOP, fill=tk.X, pady=5)
-
-    self.model_info_text = scrolledtext.ScrolledText(
-        self.right_frame, height=10, wrap=tk.WORD, bg="#000000", fg="#00FF00" # DOS-like font
-    )
-    self.model_info_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=5)
-    self.model_info_text.config(state=tk.DISABLED)
-
-    # Output Text
-    self.output_label = ttk.Label(self.right_frame, text="Output:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3")
-    self.output_label.pack(side=tk.TOP, fill=tk.X, pady=5)
-
-    self.output_text = scrolledtext.ScrolledText(
-        self.right_frame, height=10, wrap=tk.WORD, bg="black", fg="#00FF00", font=("Courier New", 10) # DOS-like font
-    )
-    self.output_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=5)
-    self.output_text.config(state=tk.DISABLED)
-
-    # Command Buttons
-    self.button_frame = tk.Frame(self.right_frame, bg=self.bg_color)
-    self.button_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
-
-    button_width = 8  # Set a smaller, fixed width for the buttons
-
-    self.tooltip = HoverTooltip(self)
-
-    self.pull_button = ttk.Button(self.button_frame, text="Pull", width=button_width, command=self.pull_model_command)
-    self.pull_button.grid(row=0, column=0, padx=5, pady=5)
-    self.pull_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Pull a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.pull_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.create_button = ttk.Button(self.button_frame, text="Create", width=button_width, command=self.create_model_command)
-    self.create_button.grid(row=0, column=1, padx=5, pady=5)
-    self.create_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Create a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.create_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.serve_button = ttk.Button(self.button_frame, text="Serve", width=button_width, command=self.serve_ollama_command)
-    self.serve_button.grid(row=0, column=2, padx=5, pady=5)
-    self.serve_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Start Ollama server.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.serve_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.run_button_2 = ttk.Button(self.button_frame, text="Run", width=button_width, command=self.run_selected_model_command)
-    self.run_button_2.grid(row=1, column=0, padx=5, pady=5)
-    self.run_button_2.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Run a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.run_button_2.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.list_button = ttk.Button(self.button_frame, text="List", width=button_width, command=self.list_models_command)
-    self.list_button.grid(row=1, column=1, padx=5, pady=5)
-    self.list_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "List available models.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.list_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.show_button = ttk.Button(self.button_frame, text="Show", width=button_width, command=self.show_model_command)
-    self.show_button.grid(row=1, column=2, padx=5, pady=5)
-    self.show_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Show information about a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.show_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.ps_button = ttk.Button(self.button_frame, text="PS", width=button_width, command=self.ps_models_command)
-    self.ps_button.grid(row=2, column=0, padx=5, pady=5)
-    self.ps_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "List running models.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.ps_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.stop_button_2 = ttk.Button(self.button_frame, text="Stop", width=button_width, command=self.stop_selected_model)
-    self.stop_button_2.grid(row=2, column=1, padx=5, pady=5)
-    self.stop_button_2.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Stop a running model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.stop_button_2.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.cp_button = ttk.Button(self.button_frame, text="CP", width=button_width, command=self.cp_model_command)
-    self.cp_button.grid(row=2, column=2, padx=5, pady=5)
-    self.cp_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Copy a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.cp_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.rm_button = ttk.Button(self.button_frame, text="RM", width=button_width, command=self.rm_model_command)
-    self.rm_button.grid(row=3, column=0, padx=5, pady=5)
-    self.rm_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Remove a model.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.rm_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    self.more_models_button = ttk.Button(self.button_frame, text="More Models", width=button_width, command=self.open_more_models)
-    self.more_models_button.grid(row=3, column=1, padx=5, pady=5)
-    self.more_models_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "More models.\nClick link for docs.", "https://ollama.ai/docs"))
-    self.more_models_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-
-    # Add a legend at the bottom of the right frame
-    legend_frame = tk.Frame(self.right_frame, bg=self.bg_color)
-    legend_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
-
-    legend_label = ttk.Label(legend_frame, text="Legend:", font=("TkDefaultFont", 10, "bold"),
-                             foreground="#fdf6e3", background=self.bg_color)
-    legend_label.grid(row=0, column=0, sticky="w", padx=5, pady=2)
-
-    checking_label = ttk.Label(legend_frame, text="Checking", foreground=self.checking_color, background=self.bg_color)
-    checking_label.grid(row=1, column=0, sticky="w", padx=5)
-
-    found_label = ttk.Label(legend_frame, text="Found", foreground=self.found_color, background=self.bg_color)
-    found_label.grid(row=1, column=1, sticky="w", padx=10)
-
-    not_found_label = ttk.Label(legend_frame, text="Not Found", foreground=self.not_found_color, background=self.bg_color)
-    not_found_label.grid(row=1, column=2, sticky="w", padx=10)
-
-    cancelled_label = ttk.Label(legend_frame, text="Cancelled", foreground=self.cancelled_color, background=self.bg_color)
-    cancelled_label.grid(row=1, column=3, sticky="w", padx=10)
-
-    # --- New Chat Window ---
-    # Create chat window in the chat_frame (newly added in ollama_gui.py)
-    self.chat_label = ttk.Label(self.chat_frame, text="Chat with AI:", font=("TkDefaultFont", 10, "bold"), foreground="#fdf6e3", background=self.bg_color)
-    self.chat_label.pack(side=tk.TOP, fill=tk.X, pady=5)
+    self.left_frame = ttk.Frame(self.master, style="Panel.TFrame")
+    self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=10, pady=10)
     
-    # Modified to use black background with color-coded text
-    self.chat_text = scrolledtext.ScrolledText(
-        self.chat_frame, 
-        wrap=tk.WORD, 
-        bg="black", 
-        fg="#00FF00",  # Default text color (green)
-        font=("Courier New", 10)  # Monospace font for better readability
+    # Create a notebook/tabbed interface for different model operations
+    model_notebook = ttk.Notebook(self.left_frame)
+    model_notebook.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+    
+    # Models tab
+    models_tab = ttk.Frame(model_notebook)
+    model_notebook.add(models_tab, text="Models")
+    
+    # Add search bar at the top
+    search_frame = ttk.Frame(models_tab)
+    search_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    self.search_entry = ttk.Entry(search_frame, style="Search.TEntry", font=("Segoe UI", 8))
+    self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=0, pady=0)
+    self.search_entry.bind("<Return>", lambda e: self.search_models())
+    
+    search_btn = ttk.Button(search_frame, text="🔍", width=3, style="Compact.TButton", command=self.search_models)
+    search_btn.pack(side=tk.RIGHT, padx=0, pady=0)
+    
+    # Create a frame for the category filter buttons
+    category_frame = ttk.Frame(models_tab)
+    category_frame.pack(fill=tk.X, padx=0, pady=3)
+    
+    # Add category filter buttons - using compact style
+    categories = ["All", "Favorites", "Large", "Small", "Chat", "Code"]
+    
+    for category in categories:
+        btn = ttk.Button(
+            category_frame, 
+            text=category, 
+            width=5, 
+            style="Compact.TButton",
+            command=lambda cat=category: self.filter_models_by_category(cat)
+        )
+        btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    # Models listbox with scrollbar
+    self.models_listbox = tk.Listbox(
+        models_tab,
+        bg="#ffffff",
+        fg="#333333",
+        selectbackground=self.listbox_select_color,
+        selectforeground="#ffffff",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Segoe UI", 8),
+        height=10
     )
-    self.chat_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+    self.models_listbox.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
+    
+    # Create a right-click context menu for models
+    self.models_context_menu = tk.Menu(
+        self.models_listbox,
+        tearoff=0,
+        bg="#ffffff",
+        fg="#333333",
+        activebackground=self.listbox_select_color,
+        activeforeground="#ffffff",
+        font=("Segoe UI", 8)
+    )
+    self.models_context_menu.add_command(label="Copy Model Name", command=self.copy_model_name)
+    self.models_context_menu.add_command(label="Tag Model", command=self.tag_selected_model)
+    self.models_context_menu.add_command(label="Toggle Favorite", command=self.toggle_favorite)
+    self.models_context_menu.add_separator()
+    self.models_context_menu.add_command(label="Export Configuration", command=self.export_model_config)
+    self.models_context_menu.add_separator()
+    self.models_context_menu.add_command(label="Create Model", command=self.open_modelfile_builder)
+    
+    # Bind the context menu to right-click
+    self.models_listbox.bind("<Button-3>", self.show_models_context_menu)
+    
+    # Scrollbar for models listbox
+    models_scrollbar = ttk.Scrollbar(models_tab, orient=tk.VERTICAL, command=self.models_listbox.yview)
+    models_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    self.models_listbox.config(yscrollcommand=models_scrollbar.set)
+    
+    # Bind selection event
+    self.models_listbox.bind('<<ListboxSelect>>', lambda event: self.show_model_information(event))
+    
+    # Additional action buttons
+    model_actions_frame = ttk.Frame(models_tab)
+    model_actions_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    refresh_btn = ttk.Button(model_actions_frame, text="Refresh", width=button_width//2, style="Secondary.TButton", command=self.refresh_models_list)
+    refresh_btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    batch_btn = ttk.Button(model_actions_frame, text="Batch...", width=button_width//2, style="Secondary.TButton", command=self.show_batch_operations)
+    batch_btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    # Running Models Tab
+    running_tab = ttk.Frame(model_notebook)
+    model_notebook.add(running_tab, text="Running")
+    
+    # Running models listbox
+    self.running_models_listbox = tk.Listbox(
+        running_tab,
+        bg="#ffffff",
+        fg="#333333",
+        selectbackground=self.listbox_select_color,
+        selectforeground="#ffffff",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Segoe UI", 8),
+        height=10
+    )
+    self.running_models_listbox.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
+    
+    # Scrollbar for running models listbox
+    running_scrollbar = ttk.Scrollbar(running_tab, orient=tk.VERTICAL, command=self.running_models_listbox.yview)
+    running_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    self.running_models_listbox.config(yscrollcommand=running_scrollbar.set)
+    
+    # Bind selection event
+    self.running_models_listbox.bind('<<ListboxSelect>>', lambda event: self.show_running_model_information(event))
+    
+    # Parameter Presets Tab
+    params_tab = ttk.Frame(model_notebook)
+    model_notebook.add(params_tab, text="Params")
+    
+    # Parameter presets manager
+    presets_btn = ttk.Button(params_tab, text="Manage Presets", style="Secondary.TButton", command=self.manage_parameter_presets)
+    presets_btn.pack(fill=tk.X, padx=5, pady=5)
+    
+    # Default parameters
+    params_frame = ttk.LabelFrame(params_tab, text="Parameters", padding=5)
+    params_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    
+    # Create parameter input fields - using smaller text and compact layout
+    param_labels = ["Temp:", "Top P:", "Top K:"]
+    param_defaults = ["0.7", "0.9", "40"]
+    
+    self.param_entries = {}
+    
+    for i, (label, default) in enumerate(zip(param_labels, param_defaults)):
+        row_frame = ttk.Frame(params_frame)
+        row_frame.pack(fill=tk.X, padx=2, pady=2)
+        
+        lbl = ttk.Label(row_frame, text=label, font=("Segoe UI", 8))
+        lbl.pack(side=tk.LEFT, padx=2)
+        
+        entry = ttk.Entry(row_frame, width=6, font=("Segoe UI", 8))
+        entry.insert(0, default)
+        entry.pack(side=tk.RIGHT, padx=2)
+        
+        self.param_entries[label.lower().rstrip(':')] = entry
+    
+    # History tab
+    history_tab = ttk.Frame(model_notebook)
+    model_notebook.add(history_tab, text="History")
+    
+    # Chat history listbox
+    self.history_listbox = tk.Listbox(
+        history_tab,
+        bg="#ffffff",
+        fg="#333333",
+        selectbackground=self.listbox_select_color,
+        selectforeground="#ffffff",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Segoe UI", 8),
+        height=10
+    )
+    self.history_listbox.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
+    
+    # Scrollbar for history listbox
+    history_scrollbar = ttk.Scrollbar(history_tab, orient=tk.VERTICAL, command=self.history_listbox.yview)
+    history_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    self.history_listbox.config(yscrollcommand=history_scrollbar.set)
+    
+    # Bind double-click to load history
+    self.history_listbox.bind('<Double-1>', self.load_chat_history)
+    
+    # History action buttons
+    history_actions_frame = ttk.Frame(history_tab)
+    history_actions_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    load_history_btn = ttk.Button(history_actions_frame, text="Load", width=button_width//3, style="Secondary.TButton", command=self.load_chat_history)
+    load_history_btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    save_history_btn = ttk.Button(history_actions_frame, text="Save", width=button_width//3, style="Secondary.TButton", command=self.save_chat_history)
+    save_history_btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    delete_history_btn = ttk.Button(history_actions_frame, text="Delete", width=button_width//3, style="Secondary.TButton", command=self.delete_chat_history)
+    delete_history_btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    # System Monitor Section
+    self.system_monitor_frame = ttk.Frame(self.left_frame, style="Panel.TFrame")
+    self.system_monitor_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    # Model Metrics Section
+    self.model_metrics_frame = ttk.Frame(self.left_frame, style="Panel.TFrame")
+    self.model_metrics_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    # Model information display
+    model_info_label = ttk.Label(self.left_frame, text="Model Information:", style="GroupHeader.TLabel")
+    model_info_label.pack(anchor=tk.W, padx=0, pady=(5, 0))
+    
+    self.model_info_text = tk.Text(
+        self.left_frame,
+        height=5,
+        bg="#f5f5f5",
+        fg="#333333",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Consolas", 8),
+        wrap=tk.WORD
+    )
+    self.model_info_text.pack(fill=tk.BOTH, expand=False, padx=0, pady=5)
+    self.model_info_text.config(state=tk.DISABLED)
+    
+    # Buttons for model operations - reduced size
+    button_frame = ttk.Frame(self.left_frame)
+    button_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    # Model operation buttons - arranged in a grid layout for better organization
+    self.model_actions = {
+        "Pull": self.pull_model_command,
+        "Run": self.run_selected_model_command,
+        "Stop": self.stop_current_operation,
+        "Remove": self.rm_model_command
+    }
+    
+    # First row of buttons
+    top_button_frame = ttk.Frame(button_frame)
+    top_button_frame.pack(fill=tk.X, padx=0, pady=2)
+    
+    # Convert dict_items to list before slicing
+    model_actions_list = list(self.model_actions.items())
+    
+    for idx, (label, command) in enumerate(model_actions_list[:2]):
+        style = "Accent.TButton" if label == "Run" else "Secondary.TButton"
+        btn = ttk.Button(top_button_frame, text=label, width=button_width, style=style, command=command)
+        btn.pack(side=tk.LEFT, padx=2, pady=0, expand=True, fill=tk.X)
+        
+    # Second row of buttons
+    bottom_button_frame = ttk.Frame(button_frame)
+    bottom_button_frame.pack(fill=tk.X, padx=0, pady=2)
+    
+    for idx, (label, command) in enumerate(model_actions_list[2:]):
+        style = "Secondary.TButton"
+        if label == "Stop":
+            style = "Command.TButton" 
+        btn = ttk.Button(bottom_button_frame, text=label, width=button_width, style=style, command=command)
+        btn.pack(side=tk.LEFT, padx=2, pady=0, expand=True, fill=tk.X)
+        
+    # Theme toggle switch
+    theme_frame = ttk.Frame(self.left_frame)
+    theme_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    self.theme_var = tk.BooleanVar(value=not self.is_dark_mode)  # False = dark, True = light
+    
+    theme_switch = ttk.Checkbutton(
+        theme_frame, 
+        text="Light Theme", 
+        style="Switch.TCheckbutton",
+        variable=self.theme_var,
+        command=self.toggle_theme
+    )
+    theme_switch.pack(side=tk.RIGHT, padx=0)
+    
+    # Help button (for keyboard shortcuts)
+    help_btn = ttk.Button(theme_frame, text="?", width=3, style="Secondary.TButton", command=self.show_keyboard_shortcuts)
+    help_btn.pack(side=tk.LEFT, padx=0)
+
+def create_right_frame(self):
+    """Creates the right frame with output display and command input"""
+    # Using a more modern panel style
+    self.right_frame = ttk.Frame(self.master, style="Panel.TFrame")
+    self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+    
+    # Ensure the tab features' height fills the entire window
+    self.right_frame.pack_propagate(False)
+    
+    # Initialize the tabs_notebook attribute
+    self.tabs_notebook = ttk.Notebook(self.right_frame)
+    self.tabs_notebook.pack(fill=tk.BOTH, expand=True)
+    
+    # Create a notebook for multiple tabs
+    self.tabs_notebook = ttk.Notebook(self.right_frame)
+    self.tabs_notebook.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+    
+    # Initialize the tab control for the right frame
+    self.tab_control = ttk.Notebook(self.right_frame)
+    self.tab_control.pack(fill=tk.BOTH, expand=True)
+    
+    # Command Output Tab
+    cmd_tab = ttk.Frame(self.tabs_notebook)
+    self.tabs_notebook.add(cmd_tab, text="Command Output")
+    
+    # Remove the input label to eliminate any additional square above the Command Output tab
+    # input_label = ttk.Label(cmd_tab, text="Command:", style="Info.TLabel")
+    # input_label.pack(anchor=tk.W, padx=0, pady=0)
+    
+    # Output text widget
+    self.output_text = tk.Text(
+        cmd_tab,
+        height=20,
+        bg="#f5f5f5",
+        fg="#333333",
+        insertbackground="#333333",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Consolas", 9),
+        wrap=tk.WORD
+    )
+    self.output_text.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
+    
+    # Configure tags for different message types
+    self.output_text.tag_configure("checking", foreground=self.checking_color)
+    self.output_text.tag_configure("found", foreground=self.found_color)
+    self.output_text.tag_configure("not_found", foreground=self.not_found_color)
+    self.output_text.tag_configure("cancelled", foreground=self.cancelled_color)
+    
+    # Command input
+    self.command_entry = ttk.Entry(cmd_tab, font=("Segoe UI", 9))
+    self.command_entry.pack(fill=tk.X, padx=0, pady=5)
+    self.command_entry.bind("<Return>", self.run_command)
+    
+    # Command buttons - use modern button styles and fix duplicate buttons
+    cmd_button_frame = ttk.Frame(cmd_tab)
+    cmd_button_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    # Initialize the clear button
+    self.clear_button = ttk.Button(cmd_button_frame, text="Clear", width=10, style="Secondary.TButton", command=lambda e=None: self.output_text.delete(1.0, tk.END))
+    self.clear_button.pack(side=tk.LEFT, padx=5, pady=5)
+    
+    # Initialize the question mark button
+    self.question_mark_button = ttk.Button(cmd_button_frame, text="?", width=3, style="Secondary.TButton", command=self.show_keyboard_shortcuts)
+    self.question_mark_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+    commands = [
+        ("Stop", "Command.TButton", self.stop_current_operation)
+    ]
+    
+    for text, style, command in commands:
+        btn = ttk.Button(cmd_button_frame, text=text, width=10, style=style, command=command)
+        btn.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    # Ensure tab features fill the window area
+    self.tab_control.pack(fill=tk.BOTH, expand=True)
+    
+    # Chat Tab
+    self.chat_frame = ttk.Frame(self.tabs_notebook)
+    self.tabs_notebook.add(self.chat_frame, text="Chat")
+    
+    # Chat display
+    chat_output_frame = ttk.Frame(self.chat_frame)
+    chat_output_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
+    
+    # Chat text widget
+    self.chat_text = tk.Text(
+        chat_output_frame,
+        height=20,
+        bg="#f5f5f5",
+        fg="#333333",
+        insertbackground="#333333",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Segoe UI", 9),
+        wrap=tk.WORD
+    )
+    self.chat_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=0, pady=0)
     self.chat_text.config(state=tk.DISABLED)
     
-    # Create tags for color-coded text
-    self.chat_text.tag_config("user", foreground="#4DA6FF")  # Blue for user messages
-    self.chat_text.tag_config("ai", foreground="#00FF00")    # Green for AI responses
-    self.chat_text.tag_config("system", foreground="#FFD700")  # Gold for system messages
-    self.chat_text.tag_config("error", foreground="#FF5555")   # Red for errors
-    self.chat_text.tag_config("debug", foreground="#888888")   # Gray for debug info
+    # Chat scrollbar
+    chat_scrollbar = ttk.Scrollbar(chat_output_frame, orient=tk.VERTICAL, command=self.chat_text.yview)
+    chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    self.chat_text.config(yscrollcommand=chat_scrollbar.set)
     
-    # Match entry color scheme with chat window
-    self.chat_entry = tk.Entry(self.chat_frame, bg="#222222", fg="#FFFFFF", insertbackground="#FFFFFF")
-    self.chat_entry.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-    self.chat_button = ttk.Button(self.chat_frame, text="Send", command=self.send_chat)
-    self.chat_button.pack(side=tk.TOP, padx=5, pady=5)
+    # Chat context menu
+    self.chat_context_menu = tk.Menu(
+        self.chat_text,
+        tearoff=0,
+        bg="#ffffff",
+        fg="#333333",
+        activebackground=self.listbox_select_color,
+        activeforeground="#ffffff",
+        font=("Segoe UI", 8)
+    )
+    self.chat_context_menu.add_command(label="Copy Selection", command=self.copy_chat_selection)
+    self.chat_context_menu.add_command(label="Copy All", command=self.copy_entire_chat)
+    self.chat_context_menu.add_separator()
+    self.chat_context_menu.add_command(label="Clear", command=self.clear_chat)
+    self.chat_context_menu.add_command(label="Search...", command=self.search_in_chat)
+    
+    # Bind the context menu to right-click
+    self.chat_text.bind("<Button-3>", self.show_chat_context_menu)
+    
+    # Configure tags for chat styling
+    self.chat_text.tag_configure("user", foreground="#1976d2")  # User messages in blue
+    self.chat_text.tag_configure("assistant", foreground="#388e3c")  # Assistant messages in green
+    self.chat_text.tag_configure("system", foreground="#e65100")  # System messages in orange
+    self.chat_text.tag_configure("error", foreground="#d32f2f")  # Error messages in red
+    
+    # System prompt and model selection
+    system_frame = ttk.Frame(self.chat_frame)
+    system_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    system_label = ttk.Label(system_frame, text="System:", width=6, style="Info.TLabel")
+    system_label.pack(side=tk.LEFT, padx=0, pady=0)
+    
+    self.system_prompt = ttk.Entry(system_frame, font=("Segoe UI", 9))
+    self.system_prompt.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2, pady=0)
+    self.system_prompt.insert(0, "You are a helpful assistant.")
+    
+    model_label = ttk.Label(system_frame, text="Model:", style="Info.TLabel")
+    model_label.pack(side=tk.LEFT, padx=(5, 0), pady=0)
+    
+    self.chat_model_var = tk.StringVar()
+    self.chat_model_dropdown = ttk.Combobox(system_frame, textvariable=self.chat_model_var, width=15, font=("Segoe UI", 9))
+    self.chat_model_dropdown.pack(side=tk.LEFT, padx=2, pady=0)
+    
+    # Chat input area
+    chat_input_frame = ttk.Frame(self.chat_frame)
+    chat_input_frame.pack(fill=tk.X, padx=0, pady=5)
+    
+    self.chat_entry = tk.Text(
+        chat_input_frame,
+        height=3,
+        bg="#ffffff",
+        fg="#333333",
+        insertbackground="#333333",
+        relief=tk.FLAT,
+        highlightthickness=0,
+        bd=1,
+        font=("Segoe UI", 9),
+        wrap=tk.WORD
+    )
+    self.chat_entry.pack(fill=tk.X, padx=0, pady=5)
+    self.chat_entry.bind("<Control-Return>", self.send_chat)
+    
+    # Chat action buttons - fixed duplication and used consistent styling
+    chat_button_frame = ttk.Frame(self.chat_frame)
+    chat_button_frame.pack(fill=tk.X, padx=0, pady=0)
+    
+    chat_actions = [
+        ("Send", "Accent.TButton", self.send_chat),
+        ("New Chat", "Secondary.TButton", self.start_new_chat),
+        ("Stop", "Command.TButton", self.stop_current_operation)  # Fixed to use stop_current_operation
+    ]
+    
+    for text, style, command in chat_actions:
+        btn = ttk.Button(chat_button_frame, text=text, width=10, style=style, command=command)
+        btn.pack(side=tk.LEFT, padx=2, pady=0)
 
-    # --- Model Monitoring Controls ---
-    self.monitoring_frame = tk.Frame(self.chat_frame, bg=self.bg_color)
-    self.monitoring_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5, padx=5)
+def create_status_bar(self):
+    """Creates the status bar at the bottom of the window"""
+    self.status_frame = ttk.Frame(self.master, style="Status.TFrame")
+    self.status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=0, pady=0)
     
-    self.monitoring_label = ttk.Label(
-        self.monitoring_frame, 
-        text="Model Monitoring:", 
-        font=("TkDefaultFont", 9, "bold"),
-        foreground="#fdf6e3", 
-        background=self.bg_color
+    # Status message on left
+    self.status_message = ttk.Label(
+        self.status_frame, 
+        text="Ready", 
+        style="Info.TLabel"
     )
-    self.monitoring_label.pack(side=tk.LEFT, padx=5, pady=5)
+    self.status_message.pack(side=tk.LEFT, padx=5, pady=2)
     
-    self.monitor_button = ttk.Button(
-        self.monitoring_frame, 
-        text="Pause Monitoring", 
-        width=12, 
-        command=self.toggle_monitoring
+    # Version info on right
+    version_label = ttk.Label(
+        self.status_frame, 
+        text="Ollama Finder v1.2", 
+        font=("Segoe UI", 7)
     )
-    self.monitor_button.pack(side=tk.LEFT, padx=5, pady=5)
-    
-    self.interval_button = ttk.Button(
-        self.monitoring_frame, 
-        text="Set Interval", 
-        width=12, 
-        command=self.adjust_monitoring_interval
-    )
-    self.interval_button.pack(side=tk.LEFT, padx=5, pady=5)
-    
-    # Add tooltips for monitoring buttons
-    self.monitor_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Toggle continuous model monitoring on/off", ""))
-    self.monitor_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
-    
-    self.interval_button.bind("<Enter>", lambda e: self.tooltip.show_tooltip(e, "Adjust how frequently models are checked (milliseconds)", ""))
-    self.interval_button.bind("<Leave>", lambda e: self.tooltip.hide_tooltip())
+    version_label.pack(side=tk.RIGHT, padx=5, pady=2)
 
-def bind_events(self, master):
-    master.bind("<Configure>", self.on_resize)
-    self.models_listbox.bind("<<ListboxSelect>>", self.show_model_information)
-    self.running_models_listbox.bind("<<ListboxSelect>>", self.show_running_model_information)
+def create_widgets(self, master):
+    """
+    Creates all widgets for the OllamaFinderGUI.
+    This function calls the other widget creation functions.
+    
+    Args:
+        self: The OllamaFinderGUI instance
+        master: The master tkinter window
+    """
+    create_left_frame(self)
+    create_right_frame(self)
+    create_status_bar(self)
+    
+    # Create tooltip handler
+    self.tooltip = HoverTooltip(self)
+    
+    # Create system monitor - passing self as the parent application instance
+    self.system_monitor = SystemMonitor(self)
+    
+    # Model metrics (initialized but updated later)
+    self.model_metrics = ModelMetricsMonitor(self)

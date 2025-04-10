@@ -212,6 +212,14 @@ def save_ollama_location(gui, ollama_path):
         log_message(gui, "Ollama not found.", gui.not_found_color)
 
 def populate_models_list(gui):
+    """
+    Populates the models listbox with the available models.
+    Clears the existing list first to prevent duplicates.
+    """
+    # Clear the listbox first to prevent duplicates
+    gui.models_listbox.delete(0, tk.END)
+    
+    # Get and add the models
     models = get_ollama_models()
     if models:
         for model in models:
@@ -258,7 +266,7 @@ def run_command(gui, command):
 
     def enqueue_output(process, out_queue, err_queue):
         # Capture and process stdout
-        for line in process.stdout:
+        for line in iter(process.stdout.readline, ''):
             if line:
                 # Remove ANSI color codes and control characters
                 clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
@@ -266,7 +274,7 @@ def run_command(gui, command):
                 out_queue.put(clean_line)
         
         # Capture and process stderr
-        for line in process.stderr:
+        for line in iter(process.stderr.readline, ''):
             if line:
                 # Remove ANSI color codes and control characters
                 clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)

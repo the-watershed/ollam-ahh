@@ -8,9 +8,13 @@ def show_model_information(self, event):
         self.selected_model = self.models_listbox.get(selection[0])
         model_info = get_model_information(self.selected_model)
         display_model_information(self, model_info)
-        self.run_button_2.config(state=tk.NORMAL)  # Enable the Run button
+        # Enable the Run button if it exists
+        if hasattr(self, 'run_button'):
+            self.run_button.config(state=tk.NORMAL)
     else:
-        self.run_button_2.config(state=tk.DISABLED)  # Disable the Run button
+        # Disable the Run button if it exists
+        if hasattr(self, 'run_button'):
+            self.run_button.config(state=tk.DISABLED)
         self.selected_model = None
 
 def show_running_model_information(self, event):
@@ -31,9 +35,13 @@ def show_running_model_information(self, event):
             self.output_text.insert(tk.END, "Could not retrieve model information.")
         self.output_text.config(state=tk.DISABLED)
 
-        self.stop_button_2.config(state=tk.NORMAL)
+        # Enable the Stop button if it exists
+        if hasattr(self, 'stop_button'):
+            self.stop_button.config(state=tk.NORMAL)
     else:
-        self.stop_button_2.config(state=tk.DISABLED)
+        # Disable the Stop button if it exists
+        if hasattr(self, 'stop_button'):
+            self.stop_button.config(state=tk.DISABLED)
         self.selected_running_model = None
 
         self.output_text.config(state=tk.NORMAL)
